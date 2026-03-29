@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Streaming Chatbot</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; }
+    .chat { display: flex; flex-direction: column; width: 600px; height: 80vh; background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.15); overflow: hidden; }
+    .messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .msg { max-width: 75%; padding: 10px 14px; border-radius: 18px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+    .msg.user { align-self: flex-end; background: #0084ff; color: white; border-bottom-right-radius: 4px; }
+    .msg.bot { align-self: flex-start; background: #e4e6eb; color: #1c1e21; border-bottom-left-radius: 4px; }
+    .input-row { display: flex; padding: 12px; border-top: 1px solid #e4e6eb; gap: 8px; }
+    input { flex: 1; padding: 10px 14px; border: 1px solid #ccc; border-radius: 20px; outline: none; font-size: 14px; }
+    input:focus { border-color: #0084ff; }
+    button { padding: 10px 20px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-size: 14px; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    .status { font-size: 11px; color: #888; text-align: center; padding: 4px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const WS_URL = "ws://localhost:8080/ws/streaming";
+
+    function App() {
+      const [messages, setMessages] = React.useState([]);
+      const [input, setInput] = React.useState("");
+      const [connected, setConnected] = React.useState(false);
+      const [waiting, setWaiting] = React.useState(false);
+      const ws = React.useRef(null);
+      const bottomRef = React.useRef(null);
+
+      React.useEffect(() => {
+        connect();
+        return () => ws.current?.close();
+      }, []);
+
+      React.useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, [messages]);
+
+      function connect() {
+        const socket = new WebSocket(WS_URL);
+        socket.onopen = () => setConnected(true);
+        socket.onclose = () => { setConnected(false); setTimeout(connect, 3000); };
+        socket.onerror = () => socket.close();
+        socket.onmessage = (e) => {
+          setWaiting(false);
+          setMessages(prev => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "bot" && last.streaming) {
+              return [...prev.slice(0, -1), { ...last, text: last.text + e.data }];
+            }
+            return [...prev, { role: "bot", text: e.data, streaming: true }];
+          });
+        };
+        ws.current = socket;
+      }
+
+      function send() {
+        const text = input.trim();
+        if (!text || !connected || waiting) return;
+        setMessages(prev => [...prev, { role: "user", text }]);
+        ws.current.send(text);
+        setInput("");
+        setWaiting(true);
+      }
+
+      return (
+        <div className="chat">
+          <div className="status">{connected ? "🟢 Connected" : "🔴 Reconnecting..."}</div>
+          <div className="messages">
+            {messages.map((m, i) => (
+              <div key={i} className={`msg ${m.role}`}>{m.text}</div>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+          <div className="input-row">
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && send()}
+              placeholder="Type a message..."
+              disabled={!connected}
+            />
+            <button onClick={send} disabled={!connected || waiting || !input.trim()}>
+              Send
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
