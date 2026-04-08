@@ -12,7 +12,7 @@ public class MemoryConfig {
     public ChatMemoryProvider chatMemoryProvider() {
         return memoryId -> MessageWindowChatMemory.builder()
                 .id(memoryId)
-                .maxMessages(10)
+                .maxMessages(1000)
                 .build();
     }
 }
