@@ -8,6 +8,7 @@ import io.quarkus.websockets.next.OnTextMessage;
 import io.quarkus.websockets.next.WebSocket;
 import io.quarkus.websockets.next.WebSocketConnection;
 import io.smallrye.common.annotation.Blocking;
+import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
@@ -30,20 +31,16 @@ public class C3POWebsocket {
 
     @OnOpen
     @Blocking
-    public Uni<String> onOpen() {
+    public Multi<String> onOpen() {
         String personId = connection.pathParam("personId");
         String personJson = starWarsAPIService.getPerson(personId);
         Person person = starWarsPersonService.chat(personJson);
 
-        return c3poService.chat("O que você acha desse personagem: " + person)
-                .collect().asList()
-                .map(tokens -> String.join("", tokens));
+        return c3poService.chat("O que você acha desse personagem: " + person);
     }
 
     @OnTextMessage
-    public Uni<String> onTextMessage(String message) {
-        return c3poService.chat(message)
-                .collect().asList()
-                .map(tokens -> String.join("", tokens));
+    public Multi<String> onTextMessage(String message) {
+        return c3poService.chat(message);
     }
 }

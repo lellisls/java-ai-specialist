@@ -337,6 +337,7 @@
     const personSelect = document.getElementById('person-select');
 
     let ws = null;
+    let currentBotP = null; // <p> of the in-progress bot bubble; null = ready for new one
 
     // ── People list ──────────────────────────────────────────────────
     async function loadPeople() {
@@ -358,6 +359,7 @@
     function connect(personId) {
       setStatus('connecting');
       reconnectBtn.style.display = 'none';
+      currentBotP = null;
 
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       ws = new WebSocket(`${proto}//${window.location.host}/ws/c3po/${personId}`);
@@ -369,7 +371,17 @@
 
       ws.onmessage = (e) => {
         hideTyping();
-        appendMsg('c3po', e.data);
+
+        if (currentBotP === null) {
+          const div = document.createElement('div');
+          div.className = 'msg c3po';
+          div.innerHTML = '<span class="label">C-3PO</span><p></p>';
+          chat.insertBefore(div, typing);
+          currentBotP = div.querySelector('p');
+        }
+
+        currentBotP.innerText += e.data;
+        scrollToBottom();
         enableInput();
       };
 
@@ -377,6 +389,7 @@
         setStatus('disconnected');
         hideTyping();
         disableInput();
+        currentBotP = null;
         if (personSelect.value) reconnectBtn.style.display = 'block';
         appendSystem('Conexão encerrada.');
       };
@@ -385,6 +398,7 @@
         setStatus('disconnected');
         hideTyping();
         disableInput();
+        currentBotP = null;
         appendSystem('Erro de conexão.');
       };
     }
@@ -394,6 +408,7 @@
       const text = input.value.trim();
       if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
       appendMsg('user', text);
+      currentBotP = null; // next response starts a fresh bubble
       ws.send(text);
       input.value = '';
       disableInput();
